@@ -12,7 +12,6 @@ use serde::Serialize;
 use strum::IntoEnumIterator;
 use strum_macros::Display;
 use strum_macros::EnumIter;
-use tracing::warn;
 use ts_rs::TS;
 
 use crate::config_types::Personality;
@@ -347,13 +346,6 @@ impl ModelInfo {
                 .get_personality_message(personality)
                 .unwrap_or_default();
             template.replace(PERSONALITY_PLACEHOLDER, personality_message.as_str())
-        } else if let Some(personality) = personality {
-            warn!(
-                model = %self.slug,
-                %personality,
-                "Model personality requested but model_messages is missing, falling back to base instructions."
-            );
-            self.base_instructions.clone()
         } else {
             self.base_instructions.clone()
         }
@@ -701,6 +693,25 @@ mod tests {
         let instructions = model.get_model_instructions(Some(Personality::Friendly));
 
         assert_eq!(instructions, "base");
+    }
+
+    #[test]
+    fn get_model_instructions_ignores_personality_when_model_messages_are_missing() {
+        let model = test_model(None);
+
+        assert_eq!(
+            model.get_model_instructions(Some(Personality::Friendly)),
+            "base"
+        );
+        assert_eq!(
+            model.get_model_instructions(Some(Personality::Pragmatic)),
+            "base"
+        );
+        assert_eq!(
+            model.get_model_instructions(Some(Personality::None)),
+            "base"
+        );
+        assert_eq!(model.get_model_instructions(None), "base");
     }
 
     #[test]

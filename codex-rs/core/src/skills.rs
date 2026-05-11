@@ -9,6 +9,7 @@ use crate::session::turn_context::TurnContext;
 use codex_analytics::InvocationType;
 use codex_analytics::SkillInvocation;
 use codex_analytics::build_track_events_context;
+use codex_otel::sanitize_metric_tag_value;
 use codex_protocol::protocol::SkillScope;
 use codex_protocol::request_user_input::RequestUserInputArgs;
 use codex_protocol::request_user_input::RequestUserInputQuestion;
@@ -212,12 +213,13 @@ pub(crate) async fn maybe_emit_implicit_skill_invocation(
         return;
     }
 
+    let skill_metric_tag = skill_name_metric_tag(&skill_name);
     turn_context.session_telemetry.counter(
         "codex.skill.injected",
         /*inc*/ 1,
         &[
             ("status", "ok"),
-            ("skill", skill_name.as_str()),
+            ("skill", skill_metric_tag.as_str()),
             ("invoke_type", "implicit"),
         ],
     );
@@ -231,4 +233,21 @@ pub(crate) async fn maybe_emit_implicit_skill_invocation(
             ),
             vec![invocation],
         );
+}
+
+fn skill_name_metric_tag(skill_name: &str) -> String {
+    sanitize_metric_tag_value(skill_name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn skill_name_metric_tag_sanitizes_plugin_scoped_skill_names() {
+        assert_eq!(
+            skill_name_metric_tag("oh-my-codex:code-review"),
+            "oh-my-codex_code-review"
+        );
+    }
 }
